@@ -1,7 +1,12 @@
-import math
+import pandas as pd
+import scipy
+import numpy as np
+
+data_dir = 'G:/major/projectCode/data/movielens/microblog/app/static/db/u1.base'
+
 ## Declare a 2-D matrix of size 944*1683 initialized to 0
 ## This is 1-indexed
-user_item_rating_matrix = [[0 for x in range(1683)] for x in range(944)]
+user_item_rating_matrix = np.zeros((944, 1683))
 ##Declare list of genres
 genres = ('unknown','Action','Adventure','Animation','Children','Comedy','Crime','Documentary','Drama','Fantasy','Film-Noir','Horror','Musical','Mystery','Romance','Sci-Fi','Thriller','War','Western');
 genreLength = len(genres)
@@ -11,9 +16,9 @@ movie_name = []
 release_date = []
 movie_url = []
 movie_genre = []
-genreRatingSum = [0]*19
-genreMovieCount = [0]*19
-genreAvgRatings = [0.0]*19
+genreRatingSum = np.zeros((1,20))
+genreMovieCount = np.zeros((1,20))
+genreAvgRatings = np.zeros((1,20), dtype=float)
 avg_rating_user = [0]*944
 avg_rating_item = [0]*1683
 ###################################
@@ -24,31 +29,31 @@ sur = []
 cos_sur = {}
 sir = []
 cos_sir = {}
-suir = [[0 for x in range(1683)] for x in range(944)]
+user_item_rating_matrix = np.zeros((944, 1683))
+# suir = [[0 for x in range(1683)] for x in range(944)]
 #######################
 ##Create object for the file
 
 def initMatrix():
-    with open('G:/major/projectCode/data/movielens/microblog/app/static/db/u1.base', 'r') as f:
-        s = f.readline().split()
-        while s:
-            user_id = int(s[0])
-            item_id = int(s[1])
-            rating = int(s[2])
-            timestamp = s[3]
+    data = pd.read_csv(data_dir + 'u1.base', sep='\s+', header=None)
+    data.columns = ["user_id", "item_id", "rating", "timestamp"]
+    for i in range(0, len(data.user_id)):
+            user_id = data.user_id[i]
+            item_id = data.item_id[i]
+            rating = data.rating[i]
+            timestamp = data.timestamp[i]
             user_item_rating_matrix[user_id][item_id] = rating
             ##print "user_id : " + str(user_id) + " item_id : " + str(item_id) + " rating : " + str(rating) + "\n"
-            s = f.readline().split()
-        #print s
-            
+
+
 
 def printMatrix(mat, numRows, numCols):
     for i in range(numRows):
         for j in range(numCols):
             print '{:4}'.format(mat[i][j]),
 
-def calcGenre():        
-    with open('G:/major/projectCode/data/movielens/microblog/app/static/db/u.item', 'r') as f:
+def calcGenre():
+    with open(data_dir + 'u.item', 'r') as f:
         s = f.readline().split('|')
         i = 0
         while s != ['']:
@@ -63,18 +68,17 @@ def calcGenre():
             s = f.readline().split('|')
             #print s
     return movie_name
-        
+
 ##printMatrix(user_item_rating_matrix,8,8)
-                
+
 def cosine_sim(v,u):
     Sum = 0
     su = 0
     sv = 0
-    for i in range(len(u)):
-        Sum += v[i] * u[i]
-        su += u[i] * u[i]
-        sv += v[i] * v[i]
-    a = (math.sqrt(su)*math.sqrt(sv))
+    Sum = np.sum(np.multiply(v[0:u.shape[0]],u))
+    su = np.sum(np.multiply(u,u))
+    sv = np.sum(np.multiply(v,v))
+    a = (scipy.sqrt(su)*scipy.sqrt(sv))
     if a > 0:
         return (Sum/a)
     else:
@@ -94,17 +98,17 @@ def calc_sur(new_user_id,n):
             cos_sur[b] = -a
 
 
-        
-                    
+
+
 def calc_sir(user_id,item_id,n):
     import Queue as Q
     q = Q.PriorityQueue()
-    rating_item = [0 for x in range(1,1683)]
+    rating_item = np.zeros((1683, 1))
     for i in range(944):
-        rating_item[i] = user_item_rating_matrix[i][item_id]     
+        rating_item[i] = user_item_rating_matrix[i][item_id]
     for i in range(1,1683):
         if(user_item_rating_matrix[user_id][i] != 0 and i != item_id):
-            temp = [0 for x in range(944)]
+            temp = np.zeros((944, 1))
             for j in range(1,944):
                 temp[j] = user_item_rating_matrix[j][i]
             val=cosine_sim(rating_item,temp)
@@ -112,8 +116,8 @@ def calc_sir(user_id,item_id,n):
     for i in range(n):
         if not q.empty():
             (a,b) = q.get()
-            sir.append(b) 
-            cos_sir[b] = -a   
+            sir.append(b)
+            cos_sir[b] = -a
 
 
 def calc_suir(new_user_id,new_item_id):
@@ -124,7 +128,7 @@ def calc_suir(new_user_id,new_item_id):
             if user_id != new_user_id and item_id != new_item_id:
                 suir[user_id][item_id] = 1
 
-### Calculate average ratings for each user and each item######################################    
+### Calculate average ratings for each user and each item######################################
 def calc_avg_rating_user():
     for user_id in range(1,944):
         S = 0
@@ -135,7 +139,7 @@ def calc_avg_rating_user():
                 C += 1
         if C > 0:
             avg_rating_user[user_id] = (S*1.0)/C
-     
+
 
 def calc_avg_rating_item():
     for item_id in range(1,1683):
@@ -162,8 +166,8 @@ def euclidean_dist(a,b):
         return a
     x = 1.0/(a*a)
     y = 1.0/(b*b)
-    return 1.0/(math.sqrt(x+y))
-    
+    return 1.0/(scipy.sqrt(x+y))
+
 
 ## Calculate expected rating value of user k for item m #########################################
 
@@ -229,18 +233,18 @@ def calc_expected_rating(k, m, max_rating_value,avgk,avgm,Lambda,delta):
         p_with_suir *= delta
         expectedRating += r*(p_with_sur + p_with_sir + p_with_suir)
     return expectedRating
-    
-######################################################################### 
+
+#########################################################################
 
    ##########Main Recommender Function############
 
 def recommender(user_id,Lambda,delta,n):
-    #initMatrix()
-    #calcGenre()
-    #user_id = int(raw_input('Enter the user id to continue : '))
-    #Lambda = float(raw_input('Enter the value of the parameter Lambda : '))    
-    #delta = float(raw_input('Enter the value of the parameter delta : '))
-    #n = int(raw_input('Enter the number of recommendations : '))
+    # initMatrix()
+    # calcGenre()
+    # user_id = int(raw_input('Enter the user id to continue : '))
+    # Lambda = float(raw_input('Enter the value of the parameter Lambda : '))
+    # delta = float(raw_input('Enter the value of the parameter delta : '))
+    # n = int(raw_input('Enter the number of recommendations : '))
     #f = open('G:/major/projectCode/data/movielens/microblog/app/static/db/f.txt','w')
 
 
@@ -283,5 +287,4 @@ def recommender(user_id,Lambda,delta,n):
     print "Mean absolute error : " + str(MAE/num) + " " + str(MAE/1683)
     return predic_rating
 
-
-
+# recommender(1, 0.9, 0.9, 10)
